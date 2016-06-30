@@ -62,7 +62,8 @@ class EncodingPlayer:
         if r.suits != 'rygbw':
             raise NameError('Encoding AI requires vanilla suits\n')
         for i in r.NameRecord:
-            if i.split('_')[0] != 'Encoding':
+            print(i)
+            if i[:-1] != 'Encoder':
                 raise NameError('Encoding AI must only play with other encoders')
         if r.nPlayers != 5:
             raise NameError('Encoding AI must play in a 5 player game')
@@ -479,13 +480,13 @@ class EncodingPlayer:
                         KnownIntersectActual = len(set(KnownSpace).intersection([int(k) for k in J]))
                         if KnownIntersectActual == 0:
                             self.InfoMatHumanReadable()  
-                            print r.h[i].cards
-                            print r.h[i].cards[j]
+                            print(r.h[i].cards)
+                            print(r.h[i].cards[j])
                             raise NameError('Incorrect value detected in encoding scheme: [' 
                                     + str(i) + ',' + str(j) + ']')
 
     def InfoMatHumanReadable(self):
-        print ''
+        print('')
         InfoMatPrint = c(self.InformationMatrix)
         MaxLen = 0
         for key in InfoMatPrint:
@@ -505,13 +506,13 @@ class EncodingPlayer:
                 return Str
             
         for key in InfoMatPrint:
-            print key    
+            print(key)
             for J in InfoMatPrint[key]:
                 for K in J:
                     if K=='x':
                         PrintStr = ''
                     else:
                         PrintStr = K
-                    print PadStr(PrintStr,MaxLen) + ' |' + ' '*4,
-                print ''
-            print ''
+                    print(PadStr(PrintStr,MaxLen) + ' |' + ' '*4,)
+                print('')
+            print('')

@@ -13,11 +13,14 @@ Common attributes/arguments:
 import random
 import logging
 from copy import deepcopy
+import sys
 
 VANILLA_SUITS = 'rygbw'
-SUIT_CONTENTS = '1112233445'
+SUIT_CONTENTS = '1112233445' # must be ascending
 N_HINTS       = 8
 N_LIGHTNING   = 3
+RAINBOW_SUIT  = '?'
+PURPLE_SUIT   = 'p'
 
 class Round:
     """Store round info and interact with AI players.
@@ -43,28 +46,30 @@ class Round:
     logger (logging object): game state log, created in the wrapper
     cardsLeft (list of str): Cards that not all players have seen yet.
     deck (list of str)
+    discardpile: list of (names of) cards which are discarded
     """
 
-    def __init__(self, gameType, names, verbosity):
+    def __init__(self, gameType, players, names, verbosity):
         """Instantiate a Round and its Hand sub-objects."""
         self.gameType  = gameType
         self.suits = VANILLA_SUITS
         if gameType == 'rainbow':
-            self.suits += '?'
+            self.suits += RAINBOW_SUIT
         elif gameType == 'purple':
-            self.suits += 'p'
+            self.suits += PURPLE_SUIT
 
         self.nPlayers = len(names)
         self.h = [self.Hand(i, names[i]) for i in range(self.nPlayers)]
 
-        self.whoseTurn     = 0
-        self.turnNumber    = 0
-        self.playHistory   = []
-        self.HandHistory   = [] # Hands at the start of each turn
-        self.progress      = {suit : 0 for suit in self.suits}
-        self.gameOverTimer = None
-        self.hints         = N_HINTS
-        self.lightning     = 0
+        self.whoseTurn          = 0
+        self.turnNumber         = 0
+        self.playHistory        = []
+        self.HandHistory        = [] # Hands at the start of each turn
+        self.progressHistory    = []
+        self.progress           = {suit : 0 for suit in self.suits}
+        self.gameOverTimer      = None
+        self.hints              = N_HINTS
+        self.lightning          = 0
 
         self.verbosity = verbosity
         self.verbose = (verbosity in ('verbose', 'log'))
@@ -72,10 +77,17 @@ class Round:
         self.zazz = ['[HANDS]', '[PLAYS]']
 
         self.logger = logging.getLogger('game_log')
-        
+
         self.NameRecord = names # Added so that AI can check what players it is playing with
+        self.PlayerRecord = players
         self.DropIndRecord = [] # Keeps track of the index of the dropped card
         self.Resign = False
+        self.discardpile = []
+
+        # This provides a shared starting seed if players wish to use fixed
+        # seed psudo RNG methods.
+        self.CommonSeed = random.randint(0,sys.maxsize)
+
         if not len(self.logger.handlers):
             # Define logging handlers if not defined by wrapper script
             # Will only happen a single time, even for multiple games
@@ -118,6 +130,7 @@ class Round:
             self.cardsLeft.remove(card['name'])
         ReplacedIndex = hand.drop(card)
         self.DropIndRecord.append(ReplacedIndex)
+        self.discardpile.append(card['name'])
         if self.deck != []:
             hand.add(self.draw(), self.turnNumber)
             return True
@@ -145,12 +158,14 @@ class Round:
         play = playType, playValue = p.play(self)
         self.playHistory.append(play)
         self.HandHistory.append(deepcopy(self.h))
+        self.progressHistory.append(deepcopy(self.progress))
         hand = self.h[self.whoseTurn]
 
         verboseHandAtStart = ' '.join([card['name'] for card in hand.cards])
         if playType == 'hint':
             assert self.hints != 0
             targetPlayer, info = playValue
+            assert targetPlayer != self.whoseTurn # cannot hint self
             targetHand = self.h[targetPlayer]
             for card in targetHand.cards:
                 suit = card['name'][1]

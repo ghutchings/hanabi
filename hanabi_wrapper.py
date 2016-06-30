@@ -12,26 +12,34 @@ Command-line arguments (see usage):
   loss_score: Whether to award points after a game is lost
 """
 
-import sys, argparse, logging
+import sys, argparse, logging, random
 from time import gmtime, strftime
 from scipy import stats, mean
+from math import sqrt
 from play_hanabi import play_one_round
+from hanabi_classes import SUIT_CONTENTS
+
 ### TODO: IMPORT YOUR PLAYER
 from cheating_idiot_player import CheatingIdiotPlayer
+from cheating_player import CheatingPlayer
 from most_basic_player import MostBasicPlayer
 from basic_rainbow_player import BasicRainbowPlayer
 from newest_card_player import NewestCardPlayer
 from human_player import HumanPlayer
-from EncodingPlayer import EncodingPlayer
-### TODO: IMPORT YOUR PLAYER
+from encoding_player import EncodingPlayer
+from general_encoding_player import GeneralEncodingPlayer
+from hat_player import HatPlayer
 
-# Define all available players.  TODO: ADD YOURS
-availablePlayers = {'cheater'  : CheatingIdiotPlayer,
-                    'basic'    : MostBasicPlayer,
-                    'brainbow' : BasicRainbowPlayer,
-                    'newest'   : NewestCardPlayer,
-                    'human'    : HumanPlayer,
-                    'encoding_': EncodingPlayer}
+# Define all available players.
+availablePlayers = {'idiot'   : CheatingIdiotPlayer, ### TODO: ADD YOURS
+                    'cheater' : CheatingPlayer,
+                    'basic'   : MostBasicPlayer,
+                    'brainbow': BasicRainbowPlayer,
+                    'newest'  : NewestCardPlayer,
+                    'human'   : HumanPlayer,
+                    'encoder' : EncodingPlayer,
+                    'gencoder': GeneralEncodingPlayer,
+                    'hat'     : HatPlayer}
 
 # Parse command-line args.
 parser = argparse.ArgumentParser(description='Process some integers.')
@@ -46,6 +54,8 @@ parser.add_argument('-v', '--verbosity', default='verbose',
   metavar='verbosity', type=str, help='silent, scores, verbose, or log')
 parser.add_argument('-l', '--loss_score', default='zero', metavar='loss_score',
   type=str, help='zero or full')
+parser.add_argument('-s', '--seed', default=-1,
+  metavar='seed', type=int, help='fixed random seed.')
 args = parser.parse_args()
 
 assert args.game_type in ('rainbow', 'purple', 'vanilla')
@@ -96,6 +106,9 @@ if args.verbosity == 'log':
                 .format(strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()),
                 args.n_rounds, args.game_type))
 
+if args.seed >= 0:
+    random.seed(args.seed)
+
 # Play rounds.
 scores = []
 for i in range(args.n_rounds):
@@ -111,8 +124,16 @@ for i in range(args.n_rounds):
 if args.verbosity != 'silent':
     logger.info('')
 if len(scores) > 1: # Only print stats if there were multiple rounds.
-    logger.info('AVERAGE SCORE (+/- 1 std. err.): {} +/- {}'\
-                .format(str(mean(scores))[:5], str(stats.sem(scores))[:4]))
+    max_score = int(SUIT_CONTENTS[-1]) * \
+                (5 if args.game_type == 'vanilla' else 6)
+    count_max = scores.count(max_score)
+    perfect_games = count_max/float(args.n_rounds)
+    # the sample standard deviation for the amount of perfect scores
+    std_perfect_games = sqrt(count_max * (args.n_rounds - count_max) / \
+                             float (args.n_rounds - 1)) / args.n_rounds
+    logger.info('AVERAGE SCORE: {:.2f} +/- {:.3f} (1 std. err.)'\
+                .format(mean(scores), stats.sem(scores)))
+    logger.info('PERFECT GAMES: {:.2f}% +/- {:.2f}pp (1 std. err.)'
+                .format(100*perfect_games, 100*std_perfect_games))
 elif args.verbosity == 'silent': # Still print score for silent single round
     logger.info('Score: ' + str(scores[0]))
-    

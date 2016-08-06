@@ -14,32 +14,14 @@ Command-line arguments (see usage):
 
 import sys, argparse, logging, random
 from time import gmtime, strftime
-from scipy import stats, mean
 from math import sqrt
-from play_hanabi import play_one_round
-from hanabi_classes import SUIT_CONTENTS
+from play_hanabi import play_one_round, player_end_game_logging
+from hanabi_classes import SUIT_CONTENTS, AIPlayer
+from players import *
 
-### TODO: IMPORT YOUR PLAYER
-from cheating_idiot_player import CheatingIdiotPlayer
-from cheating_player import CheatingPlayer
-from most_basic_player import MostBasicPlayer
-from basic_rainbow_player import BasicRainbowPlayer
-from newest_card_player import NewestCardPlayer
-from human_player import HumanPlayer
-from encoding_player import EncodingPlayer
-from general_encoding_player import GeneralEncodingPlayer
-from hat_player import HatPlayer
-
-# Define all available players.
-availablePlayers = {'idiot'   : CheatingIdiotPlayer, ### TODO: ADD YOURS
-                    'cheater' : CheatingPlayer,
-                    'basic'   : MostBasicPlayer,
-                    'brainbow': BasicRainbowPlayer,
-                    'newest'  : NewestCardPlayer,
-                    'human'   : HumanPlayer,
-                    'encoder' : EncodingPlayer,
-                    'gencoder': GeneralEncodingPlayer,
-                    'hat'     : HatPlayer}
+availablePlayers = {}
+for playerSubClass in AIPlayer.__subclasses__():
+  availablePlayers[playerSubClass.get_name()] = playerSubClass
 
 # Parse command-line args.
 parser = argparse.ArgumentParser(description='Process some integers.')
@@ -56,6 +38,10 @@ parser.add_argument('-l', '--loss_score', default='zero', metavar='loss_score',
   type=str, help='zero or full')
 parser.add_argument('-s', '--seed', default=-1,
   metavar='seed', type=int, help='fixed random seed.')
+parser.add_argument('-p', '--police',
+  dest='police', action='store_true', help='Turns on the police to catch cheaters')
+parser.set_defaults(police=False)
+
 args = parser.parse_args()
 
 assert args.game_type in ('rainbow', 'purple', 'vanilla')
@@ -63,12 +49,36 @@ assert args.n_rounds > 0
 assert args.verbosity in ('silent', 'scores', 'verbose', 'log')
 assert args.loss_score in ('zero', 'full')
 
+def get_logger(args):
+  # Create logging object for all output.
+  logger = logging.getLogger('game_log')
+  logger.setLevel(logging.DEBUG)
+  ch = logging.FileHandler('games.log') if args.verbosity == 'log'\
+                                  else logging.StreamHandler()
+  for i in range(len(logger.handlers)): logger.handlers.pop() # Added to remove duplicate logging output in Spyder
+
+  ch.setLevel(logging.INFO)
+  logger.addHandler(ch)
+  return logger
+
+def mean(lst):
+    return sum(lst) / len(lst)
+
+def std_err(lst):
+    m = mean(lst)
+    n = len(lst)
+    sumSquaredErrs = sum([(x - m)**2 for x in lst])
+    var = sumSquaredErrs / (n - 1)
+    return sqrt(var / n)
+
+logger = get_logger(args)
+
 # Load players.
 players = []
 rawNames = args.requiredPlayers + args.morePlayers
 for i in range(len(rawNames)):
     assert rawNames[i] in availablePlayers
-    players.append(availablePlayers[rawNames[i]]())
+    players.append(availablePlayers[rawNames[i]](i, logger, args.verbosity))
     rawNames[i] = rawNames[i].capitalize()
 
 # Resolve duplicate names by appending '1', '2', etc. as needed.
@@ -90,16 +100,6 @@ for i in range(len(names)):
     while len(names[i]) < len(longestName):
         names[i] += ' '
 
-# Create logging object for all output.
-logger = logging.getLogger('game_log')
-logger.setLevel(logging.DEBUG)
-ch = logging.FileHandler('games.log') if args.verbosity == 'log'\
-                                else logging.StreamHandler()
-for i in range(len(logger.handlers)): logger.handlers.pop() # Added to remove duplicate logging output in Spyder
-
-ch.setLevel(logging.INFO)
-logger.addHandler(ch)
-
 if args.verbosity == 'log':
     logger.info('#'*22 + ' NEW ROUNDSET ' + '#'*22)
     logger.info('{} ROUNDSET: {} round(s) of {} Hanabi'\
@@ -115,10 +115,11 @@ for i in range(args.n_rounds):
     if args.verbosity in ('verbose', 'log'):
         logger.info('\n' + 'ROUND {}:'.format(i))
     score = play_one_round(args.game_type, players, names, args.verbosity,
-                           args.loss_score)
+                           args.loss_score, args.police)
     scores.append(score)
     if args.verbosity != 'silent':
         logger.info('Score: ' + str(score))
+    player_end_game_logging(players)
 
 # Print average scores.
 if args.verbosity != 'silent':
@@ -132,7 +133,7 @@ if len(scores) > 1: # Only print stats if there were multiple rounds.
     std_perfect_games = sqrt(count_max * (args.n_rounds - count_max) / \
                              float (args.n_rounds - 1)) / args.n_rounds
     logger.info('AVERAGE SCORE: {:.2f} +/- {:.3f} (1 std. err.)'\
-                .format(mean(scores), stats.sem(scores)))
+                .format(mean(scores), std_err(scores)))
     logger.info('PERFECT GAMES: {:.2f}% +/- {:.2f}pp (1 std. err.)'
                 .format(100*perfect_games, 100*std_perfect_games))
 elif args.verbosity == 'silent': # Still print score for silent single round

@@ -11,7 +11,11 @@ about to be discarded, or playing all 1s from starting round hints.
 from hanabi_classes import *
 from bot_utils import *
 
-class NewestCardPlayer:
+class NewestCardPlayer(AIPlayer):
+
+    @classmethod
+    def get_name(cls):
+        return 'newest'
 
     # find the newest card in your hand for which info was relevant
     # as long as you haven't drawn any new cards, this should have the same
@@ -26,12 +30,6 @@ class NewestCardPlayer:
         hinted = [card for card in cards if matches(card['name'], info)]
         if hinted:
             return max(hinted, key=lambda card: card['time'])
-
-    def possible_hints(self, name):
-        if '?' in name:
-            return name[0] + VANILLA_SUITS
-        else:
-            return name
 
     # discard the oldest card which isn't a known five.  Unless all are fives.
     def get_discard(self, cards):
@@ -60,8 +58,8 @@ class NewestCardPlayer:
                 hintee = (target - me + r.nPlayers) % r.nPlayers
                 if target == me:
                     play = self.get_my_newest_hinted(cards, info)
-                    if play and possibly_playable(play, r.progress, r.suits):
-                            return 'play', play
+                    if play and possibly_playable(play, r.progress):
+                        return 'play', play
                 elif hintee < hinterPosition: # hintee hasn't yet played
                     targetCard = self.get_newest_hinted(r.h[target].cards, info)
                     if targetCard:
@@ -90,10 +88,9 @@ class NewestCardPlayer:
                 if playableCards != []:
                     for card in playableCards:
                         # is there a hint for which this card is the newest?
-                        for info in self.possible_hints(card['name']):
+                        for info in possible_hints(card):
                             if card == self.get_newest_hinted(othersCards, info):
                                 return 'hint', (i, info)
-
 
         # alright, don't know what to do, let's toss
         return 'discard', self.get_discard(cards)

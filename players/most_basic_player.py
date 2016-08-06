@@ -10,7 +10,12 @@ Basic players can only handle rainbow as an ordinary 6th suit.
 from hanabi_classes import *
 from bot_utils import get_plays, deduce_plays
 
-class MostBasicPlayer:
+class MostBasicPlayer(AIPlayer):
+
+    @classmethod
+    def get_name(cls):
+        return 'basic'
+
     def play(self, r):
         assert r.gameType != 'rainbow' # basic players can't handle rainbows
 

@@ -9,9 +9,16 @@ from copy import deepcopy as c
 import itertools as it
 import numpy as np
 import random, re, sys, time
+from hanabi_classes import AIPlayer
 
-class GeneralEncodingPlayer:
-    def __init__(self):
+class GeneralEncodingPlayer(AIPlayer):
+
+    @classmethod
+    def get_name(cls):
+        return 'gencoder'
+
+    def __init__(self, me, logger, verbosity):
+        super(GeneralEncodingPlayer, self).__init__(me, logger, verbosity)
         # This boolean is for replicate runs. Certain initialization routines
         # only need to be performed once, and can be carried over across
         # multiple games. However since the initialization depends on the game
@@ -20,6 +27,7 @@ class GeneralEncodingPlayer:
         self.Initialized = False                  
  
     def play(self,r):
+        r.HandHistory.append(c(r.h))
         nPriorTurns = len(r.playHistory)
         if nPriorTurns <= r.nPlayers - 1:
             self.Startup(r)
